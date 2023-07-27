@@ -1,18 +1,34 @@
 {
   "name": "woodpile",
   "version": "0.0.1",
-  "description": "",
-  "main": "test.js",
+  "description": "SWC AST walker for Javascript",
+  "main": "pkg/woodpile.js",
+  "files": [
+    "pkg/*.wasm",
+    "pkg/*.js",
+    "pkg/*.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "build": "wasm-pack build --dev --target nodejs",
+    "prepublishOnly": "npm run build",
+    "build": "wasm-pack build --target nodejs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kwonoj/woodpile.git"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "SWC",
+    "AST",
+    "estree",
+    "Babel",
+    "walker",
+    "visitor",
+    "swc_ecma_visit"
+  ],
+  "author": "OJ Kwon <kwon.ohjoong@gmail.com>",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/kwonoj/woodpile/issues"
