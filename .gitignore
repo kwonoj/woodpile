@@ -1,0 +1,6 @@
+/target
+/Cargo.lock
+/node_modules
+/test/parser/**/_actual.json
+*.log
+/test/**/_actual.*

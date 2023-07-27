@@ -1,0 +1,18 @@
+[package]
+name = "woodpile"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+swc_core = { version = "0.79.28", features = ["ecma_visit", "ecma_visit_path", "ecma_ast_serde"] }
+
+wasm-bindgen = {version = "0.2.87", features = [] }
+serde = {version = "1.0.175", features = ["derive"]}
+serde-wasm-bindgen = {version = "0.5.0"}
+js-sys = {version  = "0.3.64" }
+paste = {version = "1.0.14" }
+
+getrandom = {version = "0.2.10", features = ["js"] }

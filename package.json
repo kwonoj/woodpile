@@ -1,0 +1,24 @@
+{
+  "name": "woodpile",
+  "version": "0.0.1",
+  "description": "",
+  "main": "test.js",
+  "scripts": {
+    "build": "wasm-pack build --dev --target nodejs",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kwonoj/woodpile.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/kwonoj/woodpile/issues"
+  },
+  "homepage": "https://github.com/kwonoj/woodpile#readme",
+  "devDependencies": {
+    "@swc/core": "^1.3.71"
+  }
+}
