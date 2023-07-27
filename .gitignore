@@ -4,3 +4,4 @@
 /test/parser/**/_actual.json
 *.log
 /test/**/_actual.*
+/test.js
