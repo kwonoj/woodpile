@@ -2,7 +2,7 @@ use js_sys::Reflect;
 use paste::paste;
 use serde_wasm_bindgen::Serializer;
 use swc_core::{
-    common::{sync::Lrc, FileName, FilePathMapping, SourceMap},
+    common::{pass::AstKindPath, sync::Lrc, FileName, FilePathMapping, SourceMap},
     ecma::{
         ast::{
             ArrayLit, ArrayPat, ArrowExpr, AssignPat, AssignPatProp, AssignProp, AwaitExpr,
@@ -26,7 +26,7 @@ use swc_core::{
             VarDecl, VarDeclarator, WhileStmt, WithStmt, YieldExpr,
         },
         visit::{
-            noop_visit_mut_type, AstKindPath, VisitMut, VisitMutAstPath, VisitMutWith,
+            noop_visit_mut_type, AstParentKind, VisitMut, VisitMutAstPath, VisitMutWith,
             VisitMutWithPath,
         },
     },
@@ -34,79 +34,69 @@ use swc_core::{
 use swc_estree_ast::flavor::Flavor;
 use wasm_bindgen::{prelude::wasm_bindgen, JsCast, JsValue};
 
-pub struct BaseVisitor {
-    visitor_context: JsValue,
-    visitor: Option<JsValue>,
-    visitor_with_path: Option<JsValue>,
-}
-
-impl BaseVisitor {
-    pub fn new(visitor: JsValue) -> Self {
-        let visitor_value = if Reflect::has(&visitor, &JsValue::from_str("visit")).is_ok() {
-            Reflect::get(&visitor, &JsValue::from_str("visit")).ok()
-        } else {
-            None
-        };
-
-        let visitor_with_path =
-            if Reflect::has(&visitor, &JsValue::from_str("visitWithPath")).is_ok() {
-                Reflect::get(&visitor, &JsValue::from_str("visitWithPath")).ok()
+/// Calls a corresponding visitor callback in JavaScript with the given arguments.
+/// if visitor is _with_path, passes path_arg.
+fn call_visitor_reflected_fn(
+    visitor: &JsValue,
+    context: &JsValue,
+    property: &str,
+    arg: &JsValue,
+    path_arg: Option<&JsValue>,
+) -> Option<JsValue> {
+    let fn_value = Reflect::has(visitor, &JsValue::from_str(property))
+        .map(|has| {
+            if has {
+                Reflect::get(visitor, &JsValue::from_str(property)).ok()
             } else {
                 None
+            }
+        })
+        .unwrap_or_default();
+
+    if let Some(fn_value) = fn_value {
+        let fn_value = fn_value.dyn_into::<js_sys::Function>();
+        if let Ok(fn_value) = fn_value {
+            let result = if let Some(path_arg) = path_arg {
+                fn_value.call3(context, &arg, path_arg, context)
+            } else {
+                fn_value.call2(context, &arg, context)
             };
-
-        Self {
-            visitor_context: visitor,
-            visitor: visitor_value,
-            visitor_with_path,
-        }
-    }
-
-    fn call_visitor_reflected_fn(
-        &self,
-        property: &str,
-        arg: &JsValue,
-        path_arg: Option<&JsValue>,
-    ) -> Option<JsValue> {
-        if let Some(visitor) = &self.visitor {
-            let fn_value = Reflect::has(visitor, &JsValue::from_str(property))
-                .map(|has| {
-                    if has {
-                        Reflect::get(visitor, &JsValue::from_str(property)).ok()
-                    } else {
-                        None
-                    }
-                })
-                .unwrap_or_default();
-
-            if let Some(fn_value) = fn_value {
-                let fn_value = fn_value.dyn_into::<js_sys::Function>();
-                if let Ok(fn_value) = fn_value {
-                    let result = if let Some(path_arg) = path_arg {
-                        fn_value.call3(&self.visitor_context, &arg, path_arg, &self.visitor_context)
-                    } else {
-                        fn_value.call2(&self.visitor_context, &arg, &self.visitor_context)
-                    };
-                    if let Ok(result) = result {
-                        if result.is_object() {
-                            return Some(result);
-                        }
-                    }
+            if let Ok(result) = result {
+                if result.is_object() {
+                    return Some(result);
                 }
             }
         }
+    }
 
-        return None;
+    None
+}
+
+/// A visitor for visit callbacks.
+pub struct BaseVisitor {
+    visitor_context: JsValue,
+    visitor: JsValue,
+}
+
+impl BaseVisitor {
+    pub fn new(context: JsValue, visitor: JsValue) -> Self {
+        Self {
+            visitor_context: context,
+            visitor,
+        }
     }
 }
 
+/// Macro wraps each visit_mut_NODE
 macro_rules! write_visit_mut {
     ($capital: ident, $ty: ident) => {
         paste! {
             fn [<visit_mut_$capital:lower _$ty:snake>](&mut self, n: &mut [<$capital:upper $ty>]) {
                 let path_jsvalue = serde_wasm_bindgen::to_value(n).expect(format!("Should be able to serialize path {}", stringify!([<$capital:upper $ty>])).as_str());
 
-                let ret = self.call_visitor_reflected_fn(
+                let ret = call_visitor_reflected_fn(
+                    &self.visitor,
+                    &self.visitor_context,
                     &format!("visit{}", stringify!([<$capital$ty:camel>])),
                     &path_jsvalue,
                     None
@@ -123,10 +113,13 @@ macro_rules! write_visit_mut {
     };
     ($ty:ident) => {
         paste! {
+            // using paste! macro, combine visit_mut_ and $ty into snakecase
             fn [<visit_mut_$ty:snake>](&mut self, n: &mut $ty) {
                 let path_jsvalue = serde_wasm_bindgen::to_value(n).expect(format!("Should be able to serialize path {}", stringify!($ty)).as_str());
 
-                let ret = self.call_visitor_reflected_fn(
+                let ret = call_visitor_reflected_fn(
+                    &self.visitor,
+                    &self.visitor_context,
                     &format!("visit{}", stringify!([<$ty:camel>])),
                     &path_jsvalue,
                     None
@@ -143,25 +136,15 @@ macro_rules! write_visit_mut {
     };
 }
 
-macro_rules! some {
-    ( $var:expr ) => {
-        const a: &'static str = stringify!($var);
-    };
-}
-
 macro_rules! write_visit_mut_plural {
     ($ty:ident) => {
         paste! {
             fn [<visit_mut_$ty:snake s>](&mut self, n: &mut Vec<$ty>) {
-                /*r#"
-                interface Visitor {
-                    [<visit_mut_$ty:snake>]?: <T>($ty:lower :Array<T>) => Array<T> | void;
-                }"#;*/
-
-
                 let path_jsvalue = serde_wasm_bindgen::to_value(n).expect(format!("Should be able to serialize path {}", stringify!([<$ty s>])).as_str());
 
-                let ret = self.call_visitor_reflected_fn(
+                let ret = call_visitor_reflected_fn(
+                    &self.visitor,
+                    &self.visitor_context,
                     &format!("visit{}s", stringify!([<$ty:camel>])),
                     &path_jsvalue,
                     None
@@ -176,10 +159,6 @@ macro_rules! write_visit_mut_plural {
             }
         }
     };
-}
-
-impl VisitMutAstPath for BaseVisitor {
-    // [TODO]: serde-serialize support for AstKindPath?
 }
 
 impl VisitMut for BaseVisitor {
@@ -318,12 +297,257 @@ impl VisitMut for BaseVisitor {
     write_visit_mut!(KeyValuePatProp);
 }
 
+struct PathVisitor {
+    visitor_context: JsValue,
+    visitor: JsValue,
+}
+
+macro_rules! write_visit_mut_path {
+    ($capital: ident, $ty: ident) => {
+        paste! {
+            fn [<visit_mut_$capital:lower _$ty:snake>](&mut self, n: &mut [<$capital:upper $ty>], p: &mut AstKindPath<AstParentKind>) {
+                let node_jsvalue = serde_wasm_bindgen::to_value(n).expect(format!("Should be able to serialize path {}", stringify!([<$capital:upper $ty>])).as_str());
+                let path: &Vec<AstParentKind> = &*p;
+                let path_jsvalue = serde_wasm_bindgen::to_value(path).expect(format!("Should be able to serialize path {}", stringify!([<$capital:upper $ty>])).as_str());
+
+                let ret = call_visitor_reflected_fn(
+                    &self.visitor,
+                    &self.visitor_context,
+                    &format!("visit{}", stringify!([<$capital$ty:camel>])),
+                    &node_jsvalue,
+                    Some(&path_jsvalue)
+                );
+
+                if let Some(ret) = ret {
+                    let ret: [<$capital:upper $ty>] = serde_wasm_bindgen::from_value(ret).expect(format!("Should be able to deserialize {}", stringify!([<$capital:upper $ty>])).as_str());
+                    *n = ret;
+                }
+
+                n.visit_mut_children_with_path(self, p);
+            }
+        }
+    };
+    ($ty:ident) => {
+        paste! {
+            fn [<visit_mut_$ty:snake>](&mut self, n: &mut $ty, p: &mut AstKindPath<AstParentKind>) {
+                let node_jsvalue = serde_wasm_bindgen::to_value(n).expect(format!("Should be able to serialize node {}", stringify!($ty)).as_str());
+                let path: &Vec<AstParentKind> = &*p;
+                let path_jsvalue = serde_wasm_bindgen::to_value(path).expect(format!("Should be able to serialize path {}", stringify!($ty)).as_str());
+
+                let ret = call_visitor_reflected_fn(
+                    &self.visitor,
+                    &self.visitor_context,
+                    &format!("visit{}", stringify!([<$ty:camel>])),
+                    &node_jsvalue,
+                    Some(&path_jsvalue)
+                );
+
+                if let Some(ret) = ret {
+                    let ret: $ty = serde_wasm_bindgen::from_value(ret).expect(format!("Should be able to deserialize {}", stringify!($ty)).as_str());
+                    *n = ret;
+                }
+
+                n.visit_mut_children_with_path(self, p);
+            }
+        }
+    };
+}
+
+macro_rules! write_visit_mut_path_plural {
+    ($ty:ident) => {
+        paste! {
+            fn [<visit_mut_$ty:snake s>](&mut self, n: &mut Vec<$ty>, p: &mut AstKindPath<AstParentKind>) {
+                let node_jsvalue = serde_wasm_bindgen::to_value(n).expect(format!("Should be able to serialize node {}", stringify!([<$ty s>])).as_str());
+                let path: &Vec<AstParentKind> = &*p;
+                let path_jsvalue = serde_wasm_bindgen::to_value(path).expect(format!("Should be able to serialize path {}", stringify!([<$ty s>])).as_str());
+
+                let ret = call_visitor_reflected_fn(
+                    &self.visitor,
+                    &self.visitor_context,
+                    &format!("visit{}s", stringify!([<$ty:camel>])),
+                    &node_jsvalue,
+                    Some(&path_jsvalue)
+                );
+
+                if let Some(ret) = ret {
+                    let ret: Vec<$ty> = serde_wasm_bindgen::from_value(ret).expect(format!("Should be able to deserialize {}", stringify!([<$ty s>])).as_str());
+                    *n = ret;
+                }
+
+                n.visit_mut_children_with_path(self, p);
+            }
+        }
+    };
+}
+
+impl PathVisitor {
+    pub fn new(context: JsValue, visitor: JsValue) -> Self {
+        Self {
+            visitor_context: context,
+            visitor,
+        }
+    }
+}
+
+impl VisitMutAstPath for PathVisitor {
+    write_visit_mut_path!(Program);
+    write_visit_mut_path!(Module);
+    write_visit_mut_path!(Script);
+    write_visit_mut_path!(ModuleItem);
+    write_visit_mut_path_plural!(ModuleItem);
+    write_visit_mut_path!(ModuleDecl);
+    write_visit_mut_path!(ExportAll);
+    write_visit_mut_path!(ExportDefaultDecl);
+    write_visit_mut_path!(ExportDefaultExpr);
+    write_visit_mut_path!(ExportSpecifier);
+    write_visit_mut_path_plural!(ExportSpecifier);
+    write_visit_mut_path!(ExportNamedSpecifier);
+    write_visit_mut_path!(NamedExport);
+    write_visit_mut_path!(ModuleExportName);
+    write_visit_mut_path!(ExportNamespaceSpecifier);
+    write_visit_mut_path!(ExportDefaultSpecifier);
+    write_visit_mut_path!(Str);
+    write_visit_mut_path!(DefaultDecl);
+    write_visit_mut_path!(FnExpr);
+    write_visit_mut_path!(ExportDecl);
+    write_visit_mut_path!(ArrayLit);
+    write_visit_mut_path!(ExprOrSpread);
+    write_visit_mut_path!(SpreadElement);
+    write_visit_mut_path!(Expr);
+    write_visit_mut_path!(ArrowExpr);
+    write_visit_mut_path!(BlockStmt);
+    write_visit_mut_path!(Stmt);
+    write_visit_mut_path_plural!(Stmt);
+    write_visit_mut_path!(SwitchStmt);
+    write_visit_mut_path!(SwitchCase);
+    write_visit_mut_path_plural!(SwitchCase);
+    write_visit_mut_path!(IfStmt);
+    write_visit_mut_path!(ObjectPat);
+    write_visit_mut_path!(ObjectPatProp);
+    write_visit_mut_path_plural!(ObjectPatProp);
+    write_visit_mut_path!(ArrayPat);
+    write_visit_mut_path!(Pat);
+    write_visit_mut_path!(ImportDecl);
+    write_visit_mut_path!(ImportSpecifier);
+    write_visit_mut_path!(BreakStmt);
+    write_visit_mut_path!(WhileStmt);
+    write_visit_mut_path!(TryStmt);
+    write_visit_mut_path!(CatchClause);
+    write_visit_mut_path!(ThrowStmt);
+    write_visit_mut_path!(ReturnStmt);
+    write_visit_mut_path!(LabeledStmt);
+    write_visit_mut_path!(ForStmt);
+    write_visit_mut_path!(ForOfStmt);
+    write_visit_mut_path!(ForInStmt);
+    write_visit_mut_path!(EmptyStmt);
+    write_visit_mut_path!(DoWhileStmt);
+    write_visit_mut_path!(DebuggerStmt);
+    write_visit_mut_path!(WithStmt);
+    write_visit_mut_path!(Decl);
+    write_visit_mut_path!(VarDecl);
+    write_visit_mut_path!(VarDeclarator);
+    write_visit_mut_path_plural!(VarDeclarator);
+    write_visit_mut_path!(FnDecl);
+    write_visit_mut_path!(Class);
+    write_visit_mut_path!(ClassDecl);
+    write_visit_mut_path!(ClassExpr);
+    write_visit_mut_path!(ClassProp);
+    write_visit_mut_path!(ClassMethod);
+    write_visit_mut_path!(ClassMember);
+    write_visit_mut_path_plural!(ClassMember);
+    write_visit_mut_path!(PrivateProp);
+    write_visit_mut_path!(PrivateMethod);
+    write_visit_mut_path!(PrivateName);
+    write_visit_mut_path!(Constructor);
+    write_visit_mut_path!(StaticBlock);
+    write_visit_mut_path!(PropName);
+    write_visit_mut_path!(ComputedPropName);
+    write_visit_mut_path!(Function);
+    write_visit_mut_path!(Decorator);
+    write_visit_mut_path_plural!(Decorator);
+    write_visit_mut_path!(ExprStmt);
+    write_visit_mut_path!(ContinueStmt);
+    write_visit_mut_path!(OptChainExpr);
+    write_visit_mut_path!(PatOrExpr);
+    write_visit_mut_path!(YieldExpr);
+    write_visit_mut_path!(UpdateExpr);
+    write_visit_mut_path!(UnaryExpr);
+    write_visit_mut_path!(ThisExpr);
+    write_visit_mut_path!(Tpl);
+    write_visit_mut_path!(TaggedTpl);
+    write_visit_mut_path!(Param);
+    write_visit_mut_path_plural!(Param);
+    write_visit_mut_path!(SeqExpr);
+    write_visit_mut_path!(Lit);
+    write_visit_mut_path!(ParenExpr);
+    write_visit_mut_path!(ObjectLit);
+    write_visit_mut_path!(Prop);
+    write_visit_mut_path!(SetterProp);
+    write_visit_mut_path!(MethodProp);
+    write_visit_mut_path!(KeyValueProp);
+    write_visit_mut_path!(GetterProp);
+    write_visit_mut_path!(AssignProp);
+    write_visit_mut_path!(NewExpr);
+    write_visit_mut_path!(MetaPropExpr);
+    write_visit_mut_path!(MemberExpr);
+    write_visit_mut_path!(SuperPropExpr);
+    write_visit_mut_path!(Callee);
+    write_visit_mut_path!(JSX, Text);
+    write_visit_mut_path!(JSX, NamespacedName);
+    write_visit_mut_path!(JSX, MemberExpr);
+    write_visit_mut_path!(JSX, Object);
+    write_visit_mut_path!(JSX, Fragment);
+    write_visit_mut_path!(JSX, ClosingFragment);
+    write_visit_mut_path!(JSX, ElementChild);
+    write_visit_mut_path!(JSX, ExprContainer);
+    write_visit_mut_path!(JSX, SpreadChild);
+    write_visit_mut_path!(JSX, OpeningFragment);
+    write_visit_mut_path!(JSX, EmptyExpr);
+    write_visit_mut_path!(JSX, Element);
+    write_visit_mut_path!(JSX, ClosingElement);
+    write_visit_mut_path!(JSX, ElementName);
+    write_visit_mut_path!(JSX, OpeningElement);
+    write_visit_mut_path!(JSX, Attr);
+    write_visit_mut_path!(JSX, AttrOrSpread);
+    write_visit_mut_path!(JSX, AttrValue);
+    write_visit_mut_path!(JSX, AttrName);
+    write_visit_mut_path!(CondExpr);
+    write_visit_mut_path!(CallExpr);
+    write_visit_mut_path!(BinExpr);
+    write_visit_mut_path!(AwaitExpr);
+    write_visit_mut_path!(BindingIdent);
+    write_visit_mut_path!(Ident);
+    write_visit_mut_path!(RestPat);
+    write_visit_mut_path!(AssignPatProp);
+    write_visit_mut_path!(AssignPat);
+    write_visit_mut_path!(KeyValuePatProp);
+}
+
 #[wasm_bindgen]
 pub fn visit(p: JsValue, visitor: JsValue) {
     let mut p: Program = serde_wasm_bindgen::from_value(p).unwrap();
 
-    let mut visitor = BaseVisitor::new(visitor);
-    p.visit_mut_with(&mut visitor);
+    let visitor_value = if Reflect::has(&visitor, &JsValue::from_str("visit")).is_ok() {
+        Reflect::get(&visitor, &JsValue::from_str("visit")).ok()
+    } else {
+        None
+    };
+
+    if let Some(visitor_value) = visitor_value {
+        let mut base_visitor = BaseVisitor::new(visitor.clone(), visitor_value);
+        p.visit_mut_with(&mut base_visitor);
+    }
+
+    let visitor_with_path = if Reflect::has(&visitor, &JsValue::from_str("visitWithPath")).is_ok() {
+        Reflect::get(&visitor, &JsValue::from_str("visitWithPath")).ok()
+    } else {
+        None
+    };
+
+    if let Some(visitor_with_path) = visitor_with_path {
+        let mut path_visitor = PathVisitor::new(visitor, visitor_with_path);
+        p.visit_mut_with_path(&mut path_visitor, &mut Default::default());
+    }
 }
 
 #[wasm_bindgen(getter_with_clone)]
@@ -332,7 +556,7 @@ pub struct CompatOptions {
     pub flavor: Option<String>,
 }
 
-#[wasm_bindgen(skip_typescript)]
+#[wasm_bindgen()]
 pub fn compat(p: JsValue, opts: Option<CompatOptions>) -> JsValue {
     let p: Program = serde_wasm_bindgen::from_value(p).unwrap();
 

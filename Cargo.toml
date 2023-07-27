@@ -6,8 +6,11 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib"]
 
+[profile.release]
+lto = true
+
 [dependencies]
-swc_core = { version = "0.79.28", features = [
+swc_core = { version = "0.79.29", features = [
   "common",
   "ecma_visit",
   "ecma_visit_path",
