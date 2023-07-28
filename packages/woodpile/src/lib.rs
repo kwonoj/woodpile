@@ -33,6 +33,7 @@ use swc_core::{
 };
 use swc_estree_ast::flavor::Flavor;
 use wasm_bindgen::{prelude::wasm_bindgen, JsCast, JsValue};
+use woodpile_dts::typed_visit;
 
 /// Calls a corresponding visitor callback in JavaScript with the given arguments.
 /// if visitor is _with_path, passes path_arg.
@@ -91,6 +92,7 @@ impl BaseVisitor {
 macro_rules! write_visit_mut {
     ($capital: ident, $ty: ident) => {
         paste! {
+            #[typed_visit(Visitor)]
             fn [<visit_mut_$capital:lower _$ty:snake>](&mut self, n: &mut [<$capital:upper $ty>]) {
                 let path_jsvalue = serde_wasm_bindgen::to_value(n).expect(format!("Should be able to serialize path {}", stringify!([<$capital:upper $ty>])).as_str());
 
@@ -113,6 +115,7 @@ macro_rules! write_visit_mut {
     };
     ($ty:ident) => {
         paste! {
+            #[typed_visit(Visitor)]
             // using paste! macro, combine visit_mut_ and $ty into snakecase
             fn [<visit_mut_$ty:snake>](&mut self, n: &mut $ty) {
                 let path_jsvalue = serde_wasm_bindgen::to_value(n).expect(format!("Should be able to serialize path {}", stringify!($ty)).as_str());
@@ -139,6 +142,7 @@ macro_rules! write_visit_mut {
 macro_rules! write_visit_mut_plural {
     ($ty:ident) => {
         paste! {
+            #[typed_visit(Visitor)]
             fn [<visit_mut_$ty:snake s>](&mut self, n: &mut Vec<$ty>) {
                 let path_jsvalue = serde_wasm_bindgen::to_value(n).expect(format!("Should be able to serialize path {}", stringify!([<$ty s>])).as_str());
 
@@ -165,10 +169,10 @@ impl VisitMut for BaseVisitor {
     noop_visit_mut_type!();
 
     write_visit_mut!(Program);
+    write_visit_mut_plural!(ModuleItem);
     write_visit_mut!(Module);
     write_visit_mut!(Script);
     write_visit_mut!(ModuleItem);
-    write_visit_mut_plural!(ModuleItem);
     write_visit_mut!(ModuleDecl);
     write_visit_mut!(ExportAll);
     write_visit_mut!(ExportDefaultDecl);
@@ -305,6 +309,7 @@ struct PathVisitor {
 macro_rules! write_visit_mut_path {
     ($capital: ident, $ty: ident) => {
         paste! {
+            #[typed_visit(PathVisitor)]
             fn [<visit_mut_$capital:lower _$ty:snake>](&mut self, n: &mut [<$capital:upper $ty>], p: &mut AstKindPath<AstParentKind>) {
                 let node_jsvalue = serde_wasm_bindgen::to_value(n).expect(format!("Should be able to serialize path {}", stringify!([<$capital:upper $ty>])).as_str());
                 let path: &Vec<AstParentKind> = &*p;
@@ -329,6 +334,7 @@ macro_rules! write_visit_mut_path {
     };
     ($ty:ident) => {
         paste! {
+            #[typed_visit(PathVisitor)]
             fn [<visit_mut_$ty:snake>](&mut self, n: &mut $ty, p: &mut AstKindPath<AstParentKind>) {
                 let node_jsvalue = serde_wasm_bindgen::to_value(n).expect(format!("Should be able to serialize node {}", stringify!($ty)).as_str());
                 let path: &Vec<AstParentKind> = &*p;
@@ -356,6 +362,7 @@ macro_rules! write_visit_mut_path {
 macro_rules! write_visit_mut_path_plural {
     ($ty:ident) => {
         paste! {
+            #[typed_visit(PathVisitor)]
             fn [<visit_mut_$ty:snake s>](&mut self, n: &mut Vec<$ty>, p: &mut AstKindPath<AstParentKind>) {
                 let node_jsvalue = serde_wasm_bindgen::to_value(n).expect(format!("Should be able to serialize node {}", stringify!([<$ty s>])).as_str());
                 let path: &Vec<AstParentKind> = &*p;
@@ -523,7 +530,40 @@ impl VisitMutAstPath for PathVisitor {
     write_visit_mut_path!(KeyValuePatProp);
 }
 
-#[wasm_bindgen]
+#[wasm_bindgen(typescript_custom_section)]
+const VISITOR_INTERFACE: &'static str = r#"
+export interface Visitor<U = Record<string, any>> {
+
+}
+
+export interface PathVisitor<U = Record<string, any>> {
+
+}
+
+export interface BaseVisitorOption<C = Record<string, any>> {
+    // Arbitrary context attached in the visitor.
+    // This can be accessed visitor callback's last argument.
+    [key: string]: any;
+    // The actual object contains visitor callbacks, called with (node, context)
+    visit?: Visitor<C>;
+}
+
+export interface PathVisitorOption<C = Record<string, any>> {
+    // Arbitrary context attached in the visitor.
+    // This can be accessed visitor callback's last argument.
+    [key: string]: any;
+    // The actual object contains visitor callbacks, called with (node, path, context)
+    // path is an array of parent nodes.
+    visitWithPath?: PathVisitor<C>;
+}
+
+export type VisitorOptions = BaseVisitorOption & PathVisitorOption;
+
+/// Traverse a given AST with specified visitor.
+export function visit<T = Record<string, any>>(ast: T, visitor: VisitorOptions): void;
+"#;
+
+#[wasm_bindgen(skip_typescript)]
 pub fn visit(p: JsValue, visitor: JsValue) {
     let mut p: Program = serde_wasm_bindgen::from_value(p).unwrap();
 
@@ -550,13 +590,24 @@ pub fn visit(p: JsValue, visitor: JsValue) {
     }
 }
 
-#[wasm_bindgen(getter_with_clone)]
+#[wasm_bindgen(getter_with_clone, skip_typescript)]
 pub struct CompatOptions {
     pub source: Option<String>,
     pub flavor: Option<String>,
 }
 
-#[wasm_bindgen()]
+#[wasm_bindgen(typescript_custom_section)]
+const COMPAT_INTERFACE: &'static str = r#"
+export interface CompatOptions {
+    source?: string;
+    flavor?: "acorn" | "babel";
+}
+
+// Returns an estree-compatbile AST from SWC's AST.
+export function compat<T = Record<string, any>, U = Record<string, any>>(ast: T, options?: CompatOptions): U;
+"#;
+
+#[wasm_bindgen(skip_typescript)]
 pub fn compat(p: JsValue, opts: Option<CompatOptions>) -> JsValue {
     let p: Program = serde_wasm_bindgen::from_value(p).unwrap();
 
