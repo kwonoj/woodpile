@@ -1,0 +1,29 @@
+[package]
+name = "woodpile"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+lto = true
+
+[dependencies]
+swc_core = { workspace = true, features = [
+  "common",
+  "ecma_visit",
+  "ecma_visit_path",
+  "ecma_ast_serde",
+] }
+swc_estree_compat = { workspace = true }
+swc_estree_ast = { workspace = true }
+
+woodpile-dts = { path = "../woodpile-dts" }
+wasm-bindgen = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde-wasm-bindgen = { workspace = true }
+js-sys = { workspace = true }
+paste = { workspace = true }
+
+getrandom = { workspace = true, features = ["js"] }

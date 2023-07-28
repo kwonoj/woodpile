@@ -1,28 +1,24 @@
-[package]
-name = "woodpile"
-version = "0.1.0"
-edition = "2021"
-
-[lib]
-crate-type = ["cdylib"]
+[workspace]
+members = [
+  "packages/woodpile",
+  "packages/woodpile-dts"
+]
 
 [profile.release]
 lto = true
 
-[dependencies]
-swc_core = { version = "0.79.29", features = [
-  "common",
-  "ecma_visit",
-  "ecma_visit_path",
-  "ecma_ast_serde",
-] }
+[workspace.dependencies]
+swc_core = { version = "0.79.29"}
 swc_estree_compat = { version = "0.187.26" }
 swc_estree_ast = { version = "0.21.18" }
-
 wasm-bindgen = { version = "0.2.87" }
-serde = { version = "1.0.175", features = ["derive"] }
+serde = { version = "1.0.175"}
+serde_derive = {version = "1.0.175"}
 serde-wasm-bindgen = { version = "0.5.0" }
 js-sys = { version = "0.3.64" }
 paste = { version = "1.0.14" }
-
-getrandom = { version = "0.2.10", features = ["js"] }
+getrandom = { version = "0.2.10"}
+quote = {version = "1.0.32"}
+proc-macro2 = {version = "1.0.66"}
+syn = {version = "2.0.27"}
+convert_case = {version = "0.6.0"}
