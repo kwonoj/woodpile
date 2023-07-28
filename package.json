@@ -1,6 +1,6 @@
 {
   "name": "woodpile",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "SWC AST walker for Javascript",
   "main": "packages/woodpile/pkg/woodpile.js",
   "files": [
