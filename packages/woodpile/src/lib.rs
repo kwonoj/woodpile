@@ -50,6 +50,7 @@ export function visit<T = Record<string, any>>(ast: T, visitor: VisitorOptions):
 
 #[wasm_bindgen(skip_typescript)]
 pub fn visit(p: JsValue, visitor: JsValue) {
+    console_error_panic_hook::set_once();
     let mut p: Program = serde_wasm_bindgen::from_value(p).unwrap();
 
     let visitor_value = if Reflect::has(&visitor, &JsValue::from_str("visit")).is_ok() {

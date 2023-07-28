@@ -25,7 +25,7 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     - uses: actions/setup-node@v2
       with:
-        node-version: "16"
+        node-version: "20"
         cache: "npm"
     - uses: actions-rs/toolchain@v1
       with:
@@ -42,7 +42,7 @@ jobs:
         rustup target add wasm32-unknown-unknown
     - name: test
       run: |
-        npm run build
+        npm test
     - name: build
       run: |
         cargo check

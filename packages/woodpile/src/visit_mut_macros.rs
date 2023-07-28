@@ -10,7 +10,7 @@ macro_rules! write_visit_mut {
                     &self.visitor,
                     &self.visitor_context,
                     n,
-                    &format!("visit{}", stringify!([<$capital$ty:camel>])),
+                    &format!("visit{}", stringify!([<$capital:camel$ty:camel>])),
                     stringify!([<$capital:upper $ty>]),
                     None
                 );
@@ -73,7 +73,7 @@ macro_rules! write_visit_mut_path {
                   &self.visitor,
                   &self.visitor_context,
                   n,
-                  &format!("visit{}", stringify!([<$capital$ty:camel>])),
+                  &format!("visit{}", stringify!([<$capital:camel$ty:camel>])),
                   stringify!([<$capital:upper $ty>]),
                   Some(p)
               );

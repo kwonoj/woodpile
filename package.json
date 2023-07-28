@@ -14,7 +14,7 @@
     "prepublishOnly": "npm run build:release",
     "build:release": "wasm-pack build --target nodejs packages/woodpile",
     "build": "npm run build:release -- --dev",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npm run build && node ./spec/index.js"
   },
   "repository": {
     "type": "git",
