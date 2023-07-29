@@ -1,7 +1,7 @@
 /target
 /Cargo.lock
 /node_modules
-/test/parser/**/_actual.json
 *.log
-/test/**/_actual.*
 /test.js
+/packages/woodpile/pkg
+*.tgz
