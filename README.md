@@ -65,3 +65,56 @@ const compat_ast = compat(ast, {
   flavor: "babel" | "acorn" // optional, default to babel
 })
 ```
+
+### Bundler Configuration
+
+Usage of this package with projects (e.g. Next.js) that use Webpack may require some configuration changes.
+
+See [this issue](https://github.com/vercel/next.js/issues/29362) and [this repo](https://github.com/hasharchives/wasm-ts-esm-in-node-jest-and-nextjs) for more information.
+
+Tldr; to fix it, add the following snippet to your Webpack (or next.config.js) config:
+
+```js
+// next.config.js
+
+/** @type {import("next").NextConfig} */
+module.exports = {
+  webpack(config, { isServer, dev }) {
+    config.experiments = {
+      asyncWebAssembly: true,
+      layers: true,
+    };
+
+    if (!dev && isServer) {
+      config.output.webassemblyModuleFilename = "chunks/[id].wasm";
+      config.plugins.push(new WasmChunksFixPlugin());
+    }
+
+    config.module.rules.push({
+      test: /\.svg$/,
+      use: ["@svgr/webpack"],
+    });
+
+    return config;
+  },
+};
+
+class WasmChunksFixPlugin {
+  apply(compiler) {
+    compiler.hooks.thisCompilation.tap("WasmChunksFixPlugin", (compilation) => {
+      compilation.hooks.processAssets.tap(
+        { name: "WasmChunksFixPlugin" },
+        (assets) =>
+          Object.entries(assets).forEach(([pathname, source]) => {
+            if (!pathname.match(/\.wasm$/)) return;
+            compilation.deleteAsset(pathname);
+
+            const name = pathname.split("/")[1];
+            const info = compilation.assetsInfo.get(pathname);
+            compilation.emitAsset(name, source, info);
+          })
+      );
+    });
+  }
+}
+```
