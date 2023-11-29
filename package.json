@@ -13,8 +13,8 @@
   ],
   "scripts": {
     "prepublishOnly": "npm run build:release && rm -rf ./packages/woodpile/pkg/*/.gitignore",
-    "build:release": "./build.sh release",
-    "build": "./build.sh dev",
+    "build:release": "node scripts/build.js release",
+    "build": "node scripts/build.js dev",
     "test": "npm run build && node ./spec/index.js"
   },
   "repository": {
