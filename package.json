@@ -1,6 +1,6 @@
 {
   "name": "woodpile",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "SWC AST walker for Javascript",
   "main": "packages/woodpile/pkg/woodpile.js",
   "files": [
@@ -14,7 +14,7 @@
     "prepublishOnly": "npm run build:release && rm -rf ./packages/woodpile/pkg/.gitignore",
     "build:release": "wasm-pack build --target nodejs packages/woodpile",
     "build": "npm run build:release -- --dev",
-    "test": "npm run build && node ./spec/index.js"
+    "test": "npm run build && tsx ./spec/index.ts"
   },
   "repository": {
     "type": "git",
@@ -36,6 +36,9 @@
   },
   "homepage": "https://github.com/kwonoj/woodpile#readme",
   "devDependencies": {
-    "@swc/core": "^1.3.71"
+    "@swc/core": "^1.3.71",
+    "@types/node": "^20.14.9",
+    "tsx": "^4.16.0",
+    "wasm-pack": "^0.13.0"
   }
 }

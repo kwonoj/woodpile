@@ -30,16 +30,22 @@ visit(ast, {
 });
 ```
 
-It is possible to return node in each callback which attempts to replace given node.
+It is possible to return node in each callback which attempts to replace given node. The return value of `visit` will reflect updated AST. Note it won't replace input ast similar to `visit_mut` in swc's visitor. However, it doesn't check if the returned node is valid or not but will hard fail if the returned node is not valid.
 
 ```ts
-  visitProgram: (node) => {
-    node.Span = ...;
-    return node
-  }
+const updatedNode = visit(ast, {
+    visit: {
+        visitProgram: (node, self) => {
+            const updatedNode = {
+              ...node
+            };
+            return updatedNode;
+        },
+    },
+});
 ```
 
-However, it doesn't check if the returned node is valid or not but will hard fail if the returned node is not valid. Callback also passes `self` as a second parameter. This is a context to the visitor object itself.
+Callback also passes `self` as a second parameter. This is a context to the visitor object itself.
 
 There is also `visitWithPath` property. This visitor's callback will supply `path` to the current node. This is useful to determin what kind of parent nodes are there from existing node. The parent nodes passed into path is not a full AST node, but a subset of the nodes indicates its types.
 

@@ -1,21 +1,21 @@
-const { describe, it } = require('node:test');
-const { visit, compat } = require('../packages/woodpile/pkg');
-const { parseSync } = require('@swc/core');
-const assert = require('node:assert');
+import { describe, it } from "node:test";
+import assert from "node:assert";
+import { parseSync, printSync } from "@swc/core";
+import { visit, compat } from "../packages/woodpile/pkg";
 
 describe('visit', () => {
   it('should visit plain nodes', () => {
     const ast = parseSync('console.log("Hello, World!")');
 
-    const visits = [];
+    const visits: Array<any> = [];
     const visitor = {
       context: 1,
       visit: {
-        visitProgram: (node, self) => {
+        visitProgram: (node: any, self: any) => {
           assert(self.context === 1);
           visits.push(node);
         },
-        visitExpr: (node, self) => {
+        visitExpr: (node: any, self: any) => {
           assert(self.context === 1);
           visits.push(node);
         }
@@ -30,11 +30,11 @@ describe('visit', () => {
   it('should visit plural nodes', () => {
     const ast = parseSync('console.log("Hello, World!");console.log("Hello, World!");');
 
-    const visits = [];
+    const visits: Array<any> = [];
     const visitor = {
       context: 1,
       visit: {
-        visitModuleItems: (node, self) => {
+        visitModuleItems: (node: any, self: any) => {
           assert(self.context === 1);
           visits.push(node);
         },
@@ -51,11 +51,11 @@ describe('visit', () => {
       jsx: true,
     });
 
-    const visits = [];
+    const visits: Array<any> = [];
     const visitor = {
       context: 1,
       visit: {
-        visitJsxElement: (node, self) => {
+        visitJsxElement: (node: any, self: any) => {
           assert(self.context === 1);
           visits.push(node);
         },
@@ -71,7 +71,7 @@ describe('visitWithPath', () => {
   it('should visit plain nodes', () => {
     const ast = parseSync('console.log("Hello, World!")');
 
-    const visits = [];
+    const visits: Array<any> = [];
     const visitor = {
       context: 1,
       visitWithPath: {
@@ -96,7 +96,7 @@ describe('visitWithPath', () => {
   it('should visit plural nodes', () => {
     const ast = parseSync('console.log("Hello, World!");console.log("Hello, World!");');
 
-    const visits = [];
+    const visits: Array<any> = [];
     const visitor = {
       context: 1,
       visitWithPath: {
@@ -118,7 +118,7 @@ describe('visitWithPath', () => {
       jsx: true,
     });
 
-    const visits = [];
+    const visits: Array<any> = [];
     const visitor = {
       context: 1,
       visitWithPath: {
@@ -142,5 +142,31 @@ describe('compat', () => {
     const compatAst = compat(ast);
 
     assert(compatAst.type === "File");
+  });
+});
+
+describe("mutate", () => {
+  it("should be able to mutate", () => {
+    const ast = parseSync('console.log("TEST")');
+
+    const visitor = {
+      context: 1,
+      visit: {
+        visitExpr: (node: any, self: any) => {
+          if (node.type === "StringLiteral" && node.value === "TEST") {
+            const newNode = {
+              ...node,
+              value: "CHANGED",
+              raw: "CHANGED"
+            };
+            return newNode;
+          }
+        }
+      }
+    };
+
+    const ret = visit(ast, visitor);
+    const { code: updated } = printSync(ret);
+    assert(updated.trim() === `console.log("CHANGED");`);
   });
 });
