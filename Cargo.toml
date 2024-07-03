@@ -1,22 +1,24 @@
 [workspace]
 members = ["packages/woodpile", "packages/woodpile-dts"]
+resolver = "2"
 
 [profile.release]
 lto = true
 
 [workspace.dependencies]
-swc_core = { version = "0.79.29" }
-swc_estree_compat = { version = "0.187.26" }
-swc_estree_ast = { version = "0.21.18" }
-wasm-bindgen = { version = "0.2.87" }
-serde = { version = "1.0.175" }
-serde_derive = { version = "1.0.175" }
-serde-wasm-bindgen = { version = "0.5.0" }
-js-sys = { version = "0.3.64" }
-paste = { version = "1.0.14" }
-getrandom = { version = "0.2.10" }
-quote = { version = "1.0.32" }
-proc-macro2 = { version = "1.0.66" }
-syn = { version = "2.0.27" }
+swc_core = { version = "0.96.2" }
+swc_estree_compat = { version = "0.204.0" }
+swc_estree_ast = { version = "0.24.0" }
+wasm-bindgen = { version = "0.2.92" }
+serde = { version = "1.0.203" }
+serde_derive = { version = "1.0.203" }
+serde-wasm-bindgen = { version = "0.6.5" }
+js-sys = { version = "0.3.69" }
+paste = { version = "1.0.15" }
+getrandom = { version = "0.2.15" }
+quote = { version = "1.0.36" }
+proc-macro2 = { version = "1.0.86" }
+syn = { version = "2.0.68" }
 convert_case = { version = "0.6.0" }
 console_error_panic_hook = { version = "0.1.7" }
+console_log = { version = "1" }

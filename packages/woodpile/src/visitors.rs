@@ -16,11 +16,11 @@ use swc_core::{
             JSXOpeningFragment, JSXSpreadChild, JSXText, KeyValuePatProp, KeyValueProp,
             LabeledStmt, Lit, MemberExpr, MetaPropExpr, MethodProp, Module, ModuleDecl,
             ModuleExportName, ModuleItem, NamedExport, NewExpr, ObjectLit, ObjectPat,
-            ObjectPatProp, OptChainExpr, Param, ParenExpr, Pat, PatOrExpr, PrivateMethod,
-            PrivateName, PrivateProp, Program, Prop, PropName, RestPat, ReturnStmt, Script,
-            SeqExpr, SetterProp, SpreadElement, StaticBlock, Stmt, Str, SuperPropExpr, SwitchCase,
-            SwitchStmt, TaggedTpl, ThisExpr, ThrowStmt, Tpl, TryStmt, UnaryExpr, UpdateExpr,
-            VarDecl, VarDeclarator, WhileStmt, WithStmt, YieldExpr,
+            ObjectPatProp, OptChainExpr, Param, ParenExpr, Pat, PrivateMethod, PrivateName,
+            PrivateProp, Program, Prop, PropName, RestPat, ReturnStmt, Script, SeqExpr, SetterProp,
+            SpreadElement, StaticBlock, Stmt, Str, SuperPropExpr, SwitchCase, SwitchStmt,
+            TaggedTpl, ThisExpr, ThrowStmt, Tpl, TryStmt, UnaryExpr, UpdateExpr, VarDecl,
+            VarDeclarator, WhileStmt, WithStmt, YieldExpr,
         },
         visit::{
             noop_visit_mut_type, AstParentKind, VisitMut, VisitMutAstPath, VisitMutWith,
@@ -146,7 +146,6 @@ impl VisitMut for BaseVisitor {
     write_visit_mut!(ExprStmt);
     write_visit_mut!(ContinueStmt);
     write_visit_mut!(OptChainExpr);
-    write_visit_mut!(PatOrExpr);
     write_visit_mut!(YieldExpr);
     write_visit_mut!(UpdateExpr);
     write_visit_mut!(UnaryExpr);
@@ -280,7 +279,6 @@ impl VisitMutAstPath for PathVisitor {
     write_visit_mut_path!(ExprStmt);
     write_visit_mut_path!(ContinueStmt);
     write_visit_mut_path!(OptChainExpr);
-    write_visit_mut_path!(PatOrExpr);
     write_visit_mut_path!(YieldExpr);
     write_visit_mut_path!(UpdateExpr);
     write_visit_mut_path!(UnaryExpr);

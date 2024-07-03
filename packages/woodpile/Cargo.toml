@@ -1,6 +1,6 @@
 [package]
 name = "woodpile"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 [lib]
@@ -25,6 +25,6 @@ serde = { workspace = true, features = ["derive"] }
 serde-wasm-bindgen = { workspace = true }
 js-sys = { workspace = true }
 paste = { workspace = true }
-console_error_panic_hook = { workspace = true}
-
+console_error_panic_hook = { workspace = true }
+console_log = { workspace = true }
 getrandom = { workspace = true, features = ["js"] }

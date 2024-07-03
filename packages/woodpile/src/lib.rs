@@ -45,12 +45,13 @@ export interface PathVisitorOption<C = Record<string, any>> {
 export type VisitorOptions = BaseVisitorOption & PathVisitorOption;
 
 /// Traverse a given AST with specified visitor.
-export function visit<T = Record<string, any>>(ast: T, visitor: VisitorOptions): void;
+export function visit<T = Record<string, any>>(ast: T, visitor: VisitorOptions): T;
 "#;
 
 #[wasm_bindgen(skip_typescript)]
-pub fn visit(p: JsValue, visitor: JsValue) {
+pub fn visit(p: JsValue, visitor: JsValue) -> JsValue {
     console_error_panic_hook::set_once();
+
     let mut p: Program = serde_wasm_bindgen::from_value(p).unwrap();
 
     let visitor_value = if Reflect::has(&visitor, &JsValue::from_str("visit")).is_ok() {
@@ -74,6 +75,8 @@ pub fn visit(p: JsValue, visitor: JsValue) {
         let mut path_visitor = PathVisitor::new(visitor, visitor_with_path);
         p.visit_mut_with_path(&mut path_visitor, &mut Default::default());
     }
+
+    serde_wasm_bindgen::to_value(&p).unwrap()
 }
 
 #[wasm_bindgen(getter_with_clone, skip_typescript)]
